@@ -1,0 +1,29 @@
+pipeline {
+   agent any
+   stages {
+     stage("Clone code from git") {
+            steps {
+                script {
+                    git branch: 'master', credentialsId: '9401849a-8534-46c7-b63b-0e51798b7080', url: 'https://DenisBas@bitbucket.org/wisevision-web/wisevision-web-frontend.git'
+                    
+                }
+            }
+     }
+     stage("Build") {
+            steps {
+                script {
+                    sh "docker build -f ../Dockerfile -t $docker_hub_url:build_${BUILD_NUMBER} ."
+                }
+            }
+     }
+     stage('Deploy') {
+            steps{
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-user-credentials-prod', passwordVariable: 'PASSWD', usernameVariable: 'USER')]) {
+                   sh "echo $PASSWD | docker login -u $USER --password-stdin"
+                   sh "docker push $docker_hub_url:build_${BUILD_NUMBER}"
+                   sh "docker run -d -p 3002:3000 $docker_hub_url:build_${BUILD_NUMBER}"   
+                }
+         }
+    }
+    }
+}

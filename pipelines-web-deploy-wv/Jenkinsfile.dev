@@ -1,0 +1,38 @@
+pipeline {
+   agent any
+   stages {
+     stage("Clone code from git") {
+            steps {
+                script {
+                    git branch: 'dev', credentialsId: '9401849a-8534-46c7-b63b-0e51798b7080', url: 'https://DenisBas@bitbucket.org/wisevision-web/wisevision-web-frontend.git'
+                    
+                }
+            }
+     }
+     stage("CI") {
+            steps {
+                script {
+                    sh "yarn install --frozen-lockfile"
+                }
+            }
+     }
+     stage("Build") {
+            steps {
+                script {
+                    sh "sudo yarn build"
+                    sh "tar czfv /opt/zip-artifacts/artifact_${BUILD_NUMBER}.tar.gz ./"
+                }
+            }
+     }
+     stage("Deploy") {
+            steps {
+                script {
+                    sh "sudo systemctl stop wv_app1.service"
+                    sh "sudo rm -rf /opt/wisevision-web-frontend/*"
+                    sh "sudo cp -R /var/lib/jenkins/workspace/pipeline_wv_web/* /opt/wisevision-web-frontend/"
+                    sh "sudo systemctl start wv_app1.service"
+                }
+            }
+     }
+    }
+}

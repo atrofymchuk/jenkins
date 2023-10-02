@@ -1,0 +1,12 @@
+FROM node:16.17.1-alpine
+RUN apk update && apk add --no-cache libc6-compat autoconf automake libtool make tiff jpeg zlib zlib-dev pkgconf nasm file gcc musl-dev
+RUN npm install -g npm
+ENV PORT 3000
+COPY . /app
+WORKDIR /app
+RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
+RUN yarn install
+RUN yarn build
+EXPOSE 3000
+CMD "yarn" "run" "dev"
