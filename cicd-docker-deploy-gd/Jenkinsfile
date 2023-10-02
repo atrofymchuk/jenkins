@@ -1,0 +1,20 @@
+def buildNumber = Jenkins.instance.getItem('task_docker').lastSuccessfulBuild.number
+pipeline {
+  agent {
+     label 'app'
+  }
+  stages {
+    stage('Deploy') {
+      steps{
+        withCredentials([usernamePassword(credentialsId: 'nexus-user-credentials', passwordVariable: 'PASSWD', usernameVariable: 'USER')]) {
+          sh "docker ps -q | xargs --no-run-if-empty docker container stop"
+          sh "docker container ls -a -q | xargs -r docker container rm"
+          sh "echo $PASSWD > ./passwd"
+          sh "cat ./passwd | docker login -u $USER --password-stdin $NEXUS_REPO_URL_DOCKER_EXT"
+          sh "docker run -d -p 8080:8080 $NEXUS_REPO_BUILD_EXT:${buildNumber}"
+          sh "rm ./passwd"
+         }
+        }
+      }
+    }
+}
