@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    
+    environment {
+        NAME_TASK_BUILD = "build_petclinic"
+        
+    }
+    stages {
+        
+        stage('Deploy') {
+            steps{
+                script{ 
+                    temp_var = sh(script: 'cat ../${NAME_TASK_BUILD}/var_build', returnStdout: true).trim()
+                    env.BUILDNB = temp_var
+                    echo "BUILDNB is: ${env.BUILDNB}"
+                    echo "${env.param_build}"
+                  }
+                sh "ssh-keyscan -H $IP_SERVER_BASTION > ~/.ssh/known_hosts"
+                sh "export IP_SERVER_BASTION=${env.IP_SERVER_BASTION}"
+                sh "export USER_SERVER=${env.USER_SERVER}"
+                sh "export IP_SERVER_APP1=${env.IP_SERVER_APP1}"
+                sh "export IP_SERVER_APP2=${env.IP_SERVER_APP2}"
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: 'dev_bastion_key', keyFileVariable: 'key_bastion', usernameVariable: 'atrofymchuk'),
+                    sshUserPrivateKey(credentialsId: 'dev_app_key', keyFileVariable: 'key_app', usernameVariable: 'atrofymchuk'),
+                    file(credentialsId: 'at_key_vault', variable: 'key_vault')
+                ]) {
+                sh '''
+                echo "$key_bastion" > key_bastion_test
+                echo "$key_app" > key_app_test
+                echo "[bastion]" > inventory3
+                echo "at-dev-bastion  ansible_host=$IP_SERVER_BASTION ansible_ssh_private_key_file=$key_bastion" >> inventory3
+                echo "[app]" >> inventory3
+                echo "at-dev-app1  ansible_host=$IP_SERVER_APP1 ansible_ssh_private_key_file=$key_app" >> inventory3
+                echo "at-dev-app2  ansible_host=$IP_SERVER_APP2 ansible_ssh_private_key_file=$key_app" >> inventory3
+                echo "[bastion:vars]" >> inventory3
+                echo "ansible_user=$USER_SERVER" >> inventory3
+                echo "ansible_ssh_common_args: \'-o StrictHostKeyChecking=no\'" >> inventory3
+                echo "[app:vars]" >> inventory3
+                echo "ansible_user=$USER_SERVER" >> inventory3
+                echo "ansible_ssh_common_args=\'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand=#ssh -W %h:%p -q $USER_SERVER@$IP_SERVER_BASTION -i $key_bastion#\'" >> inventory3
+                sed -i -e 's/#/"/g' inventory3
+                ansible-playbook deploy.yml -i inventory3 --vault-password-file $key_vault --extra-vars "build_number=${BUILDNB}"
+                '''
+                }
+                
+            }
+            
+        }
+    } 
+}
